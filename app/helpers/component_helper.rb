@@ -2,28 +2,22 @@ module ComponentHelper
   def component name, **kwargs, &block
     component = Component.new(name, kwargs, lookup_context, nil, block)
 
-    component.renderer = proc do |component|
-      partial = if component.lookup_context.exists?("components/#{component.base_name}/#{component.name}", [], true)
-        "components/#{component.base_name}/#{component.name}"
-      else
-        "components/#{component.name}"
-      end
-
-      render partial, component.locals.merge(this: component) do
-        component.captured
+    component._renderer = proc do |partial, locals, captured|
+      render partial, locals do
+        captured
       end
     end
 
-    component.capture = proc do |component|
-      if component.block
+    component._capture = proc do |component, block|
+      if block
         capture do
-          component.block.call(component)
+          block.call(component)
         end
       end
     end
 
-    component.capture_self
-    component.yield_renderer
+    component._capture_self
+    component._yield_renderer
   end
 
   alias_method :comp, :component

@@ -1,46 +1,40 @@
 class Component
-  attr_reader :name
-  attr_reader :locals
-  attr_reader :block
-  attr_reader :parent
-  attr_writer :renderer
-  attr_writer :capture
-  attr_reader :captured
-  attr_reader :lookup_context
+  attr_accessor :_renderer
+  attr_accessor :_capture
 
   def initialize name, locals, lookup_context, parent, block
-    @name = name
-    @parent = parent
+    @_name = name
+    @_parent = parent
+    @_locals = locals
+    @_lookup_context = lookup_context
+    @_block = block
 
-    @components = {}
-    @locals = locals
-    @lookup_context = lookup_context
-    @block = block
-    @dynamic = false
+    @_components = {}
+    @_building = false
   end
 
   def method_missing symbol, *args, **kwargs, &block
-    # This is used when using a component
-    if @dynamic && symbol != :to_ary
+    # This is used when building a component
+    if _building && symbol != :to_ary
       if symbol.ends_with?("=") && args.length == 1
-        @locals[symbol[0..-2].to_sym] = args.first
+        _locals[symbol[0..-2].to_sym] = args.first
       else
-        @components[symbol] ||= []
+        _components[symbol] ||= []
 
-        child = Component.new(symbol, args.first || kwargs, @lookup_context, self, block)
-        child.renderer = @renderer
-        child.capture = @capture
-        child.capture_self
+        child = Component.new(symbol, args.first || kwargs, _lookup_context, self, block)
+        child._renderer = _renderer
+        child._capture = _capture
+        child._capture_self
 
-        @components[symbol] << child
+        _components[symbol] << child
       end
       nil
 
     # This is used when rendering a component
     elsif symbol.ends_with?("?")
-      @locals.key?(symbol[0..-2].to_sym) || @components.key?(symbol[0..-2].to_sym)
+      _locals.key?(symbol[0..-2].to_sym) || _components.key?(symbol[0..-2].to_sym)
     else
-      @locals[symbol] || @components[symbol]
+      _locals[symbol] || _components[symbol]
     end
   end
 
@@ -53,52 +47,76 @@ class Component
   end
 
   def require *local_keys
-    missing = local_keys.reject { |k| @locals.key?(k) || @components.key?(k) }
+    missing = local_keys.reject { |k| _locals.key?(k) || _components.key?(k) }
     if missing.count > 0
-      raise "The #{name} component requires #{missing.join(", ")} local(s) or component(s)."
+      raise "The #{_name} component requires #{missing.join(", ")} local(s) or component(s)."
     end
     nil
   end
 
   def components key
-    @components[key] || []
+    _components[key] || []
+  end
+
+  def local key
+    _locals[key]
   end
 
   def render symbol = nil
     if symbol.nil?
-      if parent.nil?
+      if _parent.nil?
         raise "Cannot render a component without a symbol when it has a parent."
       else
-        return yield_renderer
+        return _yield_renderer
       end
     end
-    @components[symbol]&.first&.yield_renderer
+    _components[symbol]&.first&._yield_renderer
   end
 
   def render_all symbol
-    @components[symbol]&.map(&:yield_renderer)&.join&.html_safe
-  end
-
-  def yield_renderer
-    @renderer.call(self)
+    _components[symbol]&.map(&:_yield_renderer)&.join&.html_safe
   end
 
   def yield
-    captured
+    _captured
   end
 
-  def capture_self
-    @dynamic = true
-    @captured = @capture.call(self)
+  def _yield_renderer
+    locals = _locals.merge(this: self)
+    _renderer.call(_partial, locals, _captured)
+  end
+
+  def _capture_self
+    self._building = true
+    self._captured = _capture.call(self, _block)
   ensure
-    @dynamic = false
+    self._building = false
   end
 
-  def base_name
+  protected
+
+  attr_reader :_name
+  attr_reader :_locals
+  attr_reader :_components
+  attr_reader :_block
+  attr_reader :_parent
+  attr_accessor :_captured
+  attr_reader :_lookup_context
+  attr_accessor :_building
+
+  def _base_name
     on = self
-    until on.parent.nil?
-      on = on.parent
+    until on._parent.nil?
+      on = on._parent
     end
-    on.name
+    on._name
+  end
+
+  def _partial
+    @partial ||= if _lookup_context.exists?("components/#{_base_name}/#{_name}", [], true)
+      "components/#{_base_name}/#{_name}"
+    else
+      "components/#{_name}"
+    end
   end
 end

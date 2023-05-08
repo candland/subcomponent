@@ -6,8 +6,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["candland"]
   spec.email = ["candland@gmail.com"]
   spec.homepage = "https://candland.net/subcomponent"
-  spec.summary = "Very simple view based components"
-  spec.description = "Very simple view based components."
+  spec.summary = "Very simple parial based components"
+  spec.description = "Very simple parial based components."
   spec.license = "MIT"
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/candland/subcomponent"

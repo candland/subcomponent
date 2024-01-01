@@ -1,17 +1,33 @@
 class Component
-  attr_accessor :_renderer
-  attr_accessor :_capture
+  attr_accessor :_renderer, :_capture
 
   # Use Component::ComponentHelper to create components.
-  def initialize name, locals, lookup_context, parent, block
+  def initialize(name, locals, lookup_context, parent, block)
     @_name = name
     @_parent = parent
     @_locals = locals
     @_lookup_context = lookup_context
     @_block = block
+    @_index = 0
 
     @_components = {}
     @_building = false
+  end
+
+  # :nodoc:
+  def initialize_dup(other)
+    @_name = other._name
+    @_parent = other._parent
+    @_locals = other._locals.dup
+    @_lookup_context = other._lookup_context
+    @_block = other._block
+    @_components = other._components.dup
+    @_building = false
+    @_renderer = other._renderer
+    @_capture = other._capture
+    @_index = 0
+
+    super
   end
 
   # Specify and use local values or sub-components using method calls.
@@ -100,9 +116,8 @@ class Component
   #
   def require *local_keys
     missing = local_keys.reject { |k| _locals.key?(k) || _components.key?(k) }
-    if missing.count > 0
-      raise "The #{_name} component requires #{missing.join(", ")} local(s) or component(s)."
-    end
+    raise "The #{_name} component requires #{missing.join(", ")} local(s) or component(s)." if missing.count > 0
+
     nil
   end
 
@@ -116,12 +131,12 @@ class Component
   #
   #   returns: [<Component>, <Component>, ...]
   #
-  def components key
+  def components(key)
     _components[key] || []
   end
 
   # This is used to access locals passed to the component.
-  def local key
+  def local(key)
     _locals[key]
   end
 
@@ -135,13 +150,12 @@ class Component
   #
   #   this.header.render
   #
-  def render symbol = nil
+  def render(symbol = nil)
     if symbol.nil?
-      if _parent.nil?
-        raise "Cannot render a component without a symbol when it has a parent."
-      else
-        return _yield_renderer
-      end
+      raise "Cannot render a component without a symbol when it has a parent." if _parent.nil?
+
+      return _yield_renderer
+
     end
     _components[symbol]&.first&._yield_renderer
   end
@@ -152,8 +166,29 @@ class Component
   #
   # Returns a string of all rednered sub-components.
   #
-  def render_all symbol
-    _components[symbol]&.map(&:_yield_renderer)&.join&.html_safe
+  def render_all(symbol)
+    _components[symbol]&.each_with_index { |e, i| e._index = i }&.map(&:_yield_renderer)&.join&.html_safe
+  end
+
+  # Copy all sub-components from one name to another.
+  # This is useful when you want to render a sub-component using two+ subcomponents
+  #
+  #   this.copy_components :links, :mobile_links
+  #
+  def copy_components(from, to)
+    _components[to] = _components[from].map(&:dup).tap do |comps|
+      comps.each do |comp|
+        comp._name = to
+      end
+    end
+  end
+
+  # This will be set to the index of the component when using `render_all`
+  #
+  # Returns an integer
+  #
+  def index
+    _index
   end
 
   # Yield the block passed to the component.
@@ -180,21 +215,13 @@ class Component
 
   protected
 
-  attr_reader :_name
-  attr_reader :_locals
-  attr_reader :_components
-  attr_reader :_block
-  attr_reader :_parent
-  attr_accessor :_captured
-  attr_reader :_lookup_context
-  attr_accessor :_building
+  attr_accessor :_name, :_captured, :_building, :_index
+  attr_reader :_locals, :_components, :_block, :_parent, :_lookup_context
 
   # :nodoc:
   def _base_name
     on = self
-    until on._parent.nil?
-      on = on._parent
-    end
+    on = on._parent until on._parent.nil?
     on._name
   end
 

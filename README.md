@@ -76,6 +76,63 @@ This will render:
 </div>
 ```
 
+### Example Component with multiple Subcomponents
+
+Create a card component in `app/views/components/card/_card.html.erb`:
+```erb
+<div>
+  <% this.copy_components :links, :mobile_links %>
+  <%= this.render :links %>
+  <%= this.render :mobile_links %>
+  <%= this.text || this.yield %>
+</div>
+```
+
+Create the link subcomponent in `app/views/components/card/_link.html.erb`:
+```erb
+<a class="desktop" href="<%= this.url %>">
+  <%= this.index %>: <%= this.text %>
+</a>
+```
+
+Create the mobile_link subcomponent in `app/views/components/card/_mobile_link.html.erb`:
+```erb
+<a class="mobile" href="<%= this.url %>">
+  <%= this.index %>: <%= this.text %>
+</a>
+```
+
+You can use `this.render_all` to render multiple subcomponent. The subcomponent will have access
+to the locals and subcomponents passed in the view. The components `index` method will be set.
+
+To use the component in a view:
+```erb
+<%= component :card do |c| %>
+  <%= c.link text: 'Card Link 1', url: '#" %>
+  <%= c.link text: 'Card Link 2', url: '#" %>
+  <p>Card Text</p>
+<% end %>
+```
+
+This will render:
+```html
+<div>
+  <a class="desktop" href="#">
+    0: Card Link 1
+  </a>
+  <a class="desktop" href="#">
+    1: Card Link 2
+  </a>
+  <a class="mobile" href="#">
+    0: Card Link 1
+  </a>
+  <a class="mobile" href="#">
+    1: Card Link 2
+  </a>
+  <p>Card Text</p>
+</div>
+```
+
 ### Example Using Locals without method_missing.
 
 In some cases you may want to use a local variable that

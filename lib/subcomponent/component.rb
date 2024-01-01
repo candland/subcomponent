@@ -176,6 +176,8 @@ class Component
   #   this.copy_components :links, :mobile_links
   #
   def copy_components(from, to)
+    return if _components[from].nil?
+
     _components[to] = _components[from].map(&:dup).tap do |comps|
       comps.each do |comp|
         comp._name = to
